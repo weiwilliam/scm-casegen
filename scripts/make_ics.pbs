@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#PBS -N make_ics
+#PBS -l select=1:ncpus=24:mpiprocs=24:mem=200GB
+#PBS -l walltime=01:00:00
+#PBS -j oe
+#
+# Build surface/soil initial conditions for the case date with chgres_cube.
+#
+#   qsub -A $CASEGEN_ACCOUNT -q $CASEGEN_QUEUE \
+#        -l job_priority=$CASEGEN_PRIORITY \
+#        -v CASEGEN_ENV=$PWD/casegen.env scripts/make_ics.pbs
+#
+# Only sfc_data is rebuilt: with UFS_case_gen forcing_method=2 the atmospheric
+# state comes from the history files, so convert_atm=.false. and no vertical
+# coordinate file is needed. Grid and orography are static and symlinked by
+# scripts/assemble_in_dir.sh.
+set -euo pipefail
+source "${CASEGEN_ENV:?set -v CASEGEN_ENV=/path/to/casegen.env}"
+
+export LMOD_TMOD_FIND_FIRST=yes
+module reset
+module use "$CASEGEN_UFS_UTILS/modulefiles"
+module load build.derecho.intel
+
+RUN=$CASEGEN_IC_DIR/chgres_run
+mkdir -p "$RUN" "$CASEGEN_IC_DIR/grid"
+cd "$CASEGEN_IC_DIR/grid"
+
+# chgres derives the resolution prefix by splitting the orography filename on
+# the literal "_oro_" (program_setup.F90). The static files are named
+# oro_data.tile1.nc, which does not match, and the miss is NOT caught: the guard
+# tests `ie == 0` while a miss gives -1, so the prefix comes out empty and the
+# run dies on "NULL/.slope_type.tile1.nc". These symlinks supply the name it
+# expects.
+for t in 1 2 3 4 5 6; do
+  ln -sf "$CASEGEN_STATIC_GRID/oro_data.tile${t}.nc"  "C${CASEGEN_CRES}_oro_data.tile${t}.nc"
+  ln -sf "$CASEGEN_STATIC_GRID/C${CASEGEN_CRES}_grid.tile${t}.nc" "C${CASEGEN_CRES}_grid.tile${t}.nc"
+done
+ln -sf "$CASEGEN_STATIC_GRID/grid_spec.nc" "C${CASEGEN_CRES}_mosaic.nc"
+
+cd "$RUN"
+Y=${CASEGEN_DATE:0:4}; M=${CASEGEN_DATE:4:2}; D=${CASEGEN_DATE:6:2}; H=${CASEGEN_DATE:8:2}
+ORO=$(for t in 1 2 3 4 5 6; do printf '"C%s_oro_data.tile%s.nc",' "$CASEGEN_CRES" "$t"; done | sed 's/,$//')
+sed -e "s#@GRID_DIR@#$CASEGEN_IC_DIR/grid#g" \
+    -e "s#@CLIMO_DIR@#$CASEGEN_CLIMO_DIR#g" \
+    -e "s#@FORCING_DIR@#$CASEGEN_FORCING_DIR#g" \
+    -e "s#@SFCANL@#gdas.t${H}z.sfcanl.nc#g" \
+    -e "s#@ORO_FILES@#$ORO#g" \
+    -e "s#@CRES@#$CASEGEN_CRES#g" \
+    -e "s#@YEAR@#$Y#g" -e "s#@MON@#${M#0}#g" \
+    -e "s#@DAY@#${D#0}#g" -e "s#@HOUR@#${H#0}#g" \
+    "$CASEGEN_REPO/templates/chgres_config.nml" > config.nml
+
+# chgres_cube reads ./fort.41. A Fortran open() without status='old' CREATES an
+# empty file, so a missing namelist fails at the read, not the open.
+ln -sf config.nml fort.41
+
+export OMP_NUM_THREADS=1
+mpiexec -n 24 -ppn 24 "$CASEGEN_UFS_UTILS/install/bin/chgres_cube"
+ls -la out.sfc.tile*.nc

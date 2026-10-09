@@ -1,0 +1,19 @@
+stid,type,number,name,lat [degrees],lon [degrees],elevation [m],county,nearest_city,state,distance_from_town [km],direction_from_town [degrees],climate_division,climate_division_name,wfo,commissioned,decommissioned,color
+FLUX_BELL,flux,3030,Belleville,43.78962,-76.11373,144.78,Jefferson,Belleville,NY,0.8,NE,9,Great Lakes,BUF,2017-05-15 23:30:00 UTC,,#00a309
+FLUX_BKLN,flux,3033,Brooklyn,40.631762,-73.953678,33.22,Kings,Brooklyn,NY,5.2,ESE,4,Coastal,OKX,2017-07-19 19:10:00 UTC,,#5e5d5e
+FLUX_BURT,flux,3119,Burt,43.31699,-78.74903,96.012,Niagara,Burt,NY,2.9,W,9,Great Lakes,BUF,2017-03-10 20:31:00 UTC,,#5c008e
+FLUX_CHAZ,flux,3029,Chazy,44.89565,-73.46461,56.571,Clinton,Chazy,NY,2.4,WNW,7,Champlain Valley,BTV,2017-03-17 17:15:00 UTC,,#ff6a00
+FLUX_CLAR,flux,3110,Claryville,41.9792,-74.5171,583.692,Ulster,Claryville,NY,8.2,NE,2,Eastern Plateau,BGM,2020-01-09 20:00:00 UTC,,#27fec7
+FLUX_FRED,flux,3056,Fredonia,42.41817,-79.3666,238.75,Chautauqua,Fredonia,NY,3.7,SW,9,Great Lakes,BUF,2017-07-01 12:19:00 UTC,,#c826ff
+FLUX_ONTA,flux,3037,Ontario,43.25941,-77.37331,99.8525,Wayne,Ontario,NY,8.4,WNW,9,Great Lakes,BUF,2017-03-09 00:31:00 UTC,,#7c0000
+FLUX_OWEG,flux,3052,Owego,42.02571,-76.25543,447.873,Tioga,Owego,NY,8.5,S,2,Eastern Plateau,BGM,2017-04-05 21:00:00 UTC,,#004404
+FLUX_PENN,flux,3077,Penn Yan,42.65578,-76.98746,250.668,Yates,Penn Yan,NY,5.5,E,10,Central Lakes,BGM,2017-05-23 19:00:00 UTC,,#ffb600
+FLUX_QUEE,flux,3034,Queens,40.734335,-73.815856,54.5592,Queens,Queens,NY,1.9,WNW,4,Coastal,OKX,2017-04-18 20:50:00 UTC,,#000000
+FLUX_REDF,flux,3120,Redfield,43.62218,-75.87769,380.39,Oswego,Redfield,NY,10.9,NNW,9,Great Lakes,BUF,2017-03-06 20:55:00 UTC,,#007707
+FLUX_REDH,flux,3025,Red Hook,42.00168,-73.88391,64.8005,Dutchess,Red Hook,NY,1,NW,5,Hudson Valley,ALY,2017-03-06 22:32:00 UTC,,#f76f6f
+FLUX_SCHU,flux,3009,Schuylerville,43.116996,-73.578284,31.4462,Saratoga,Schuylerville,NY,1.9,N,5,Hudson Valley,ALY,2017-02-28 00:01:00 UTC,,#0008ff
+FLUX_SOUT,flux,3035,Southold,41.040081,-72.465864,8.93064,Suffolk,Southold,NY,4.3,SW,4,Coastal,OKX,2017-05-10 21:09:00 UTC,,#fc11f8
+FLUX_STAT,flux,3020,Staten Island,40.604014,-74.148499,33.1,Richmond,Staten Island,NY,5.3,N,4,Coastal,OKX,2017-05-03 21:30:00 UTC,,#b5b5b5
+FLUX_VOOR,flux,3003,Voorheesville,42.65242,-73.97562,115.062,Albany,Voorheesville,NY,3.8,W,5,Hudson Valley,ALY,2017-02-03 18:00:00 UTC,,#ff0000
+FLUX_WARS,flux,3072,Warsaw,42.77993,-78.20889,540.715,Wyoming,Warsaw,NY,7.6,NW,10,Central Lakes,BUF,2017-06-30 00:01:00 UTC,,#fcf800
+FLUX_WHIT,flux,3010,Whitehall,43.485073,-73.423071,36.5638,Washington,Whitehall,NY,8,S,7,Champlain Valley,ALY,2017-02-28 00:01:00 UTC,,#3acaff

@@ -1,0 +1,19 @@
+&config
+  input_facsf_file="@CLIMO_SRC@/facsf.1.0.nc"
+  input_substrate_temperature_file="@CLIMO_SRC@/substrate_temperature.gfs.0.5.nc"
+  input_maximum_snow_albedo_file="@CLIMO_SRC@/maximum_snow_albedo.0.05.nc"
+  input_snowfree_albedo_file="@CLIMO_SRC@/snowfree_albedo.4comp.0.05.nc"
+  input_slope_type_file="@CLIMO_SRC@/slope_type.1.0.nc"
+  input_soil_type_file="@CLIMO_SRC@/soil_type.statsgo.0.05.nc"
+  input_soil_color_file="@CLIMO_SRC@/soil_color.clm.0.05.nc"
+  input_vegetation_type_file="@CLIMO_SRC@/vegetation_type.modis.igbp.0.05.nc"
+  input_vegetation_greenness_file="@CLIMO_SRC@/vegetation_greenness.0.144.nc"
+  mosaic_file_mdl="@GRID_DIR@/@CRES@_mosaic.nc"
+  orog_dir_mdl="@GRID_DIR@"
+  orog_files_mdl="@CRES@_oro_data.tile1.nc","@CRES@_oro_data.tile2.nc","@CRES@_oro_data.tile3.nc","@CRES@_oro_data.tile4.nc","@CRES@_oro_data.tile5.nc","@CRES@_oro_data.tile6.nc"
+  halo=0
+  maximum_snow_albedo_method="bilinear"
+  snowfree_albedo_method="bilinear"
+  vegetation_greenness_method="bilinear"
+  fract_vegsoil_type=.false.
+/

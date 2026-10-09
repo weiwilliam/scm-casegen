@@ -1,0 +1,16 @@
+casegen.env
+__pycache__/
+*.pyc
+*.log
+*.ESMF_LogFile
+PET*.ESMF_LogFile
+fort.41
+jobid.txt
+data/scm_locations_*.csv
+!data/scm_locations_2022081500.csv
+
+# editor leftovers
+*.swp
+*.swo
+*~
+.*.sw[a-p]

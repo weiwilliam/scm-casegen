@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#PBS -N sfc_climo
+#PBS -l select=1:ncpus=48:mpiprocs=48:mem=220GB
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#
+# Regrid the raw surface climatology onto the target cubed-sphere grid.
+# One-off per resolution, NOT per case date.
+#
+#   qsub -A $CASEGEN_ACCOUNT -q $CASEGEN_QUEUE \
+#        -l job_priority=$CASEGEN_PRIORITY \
+#        -v CASEGEN_ENV=$PWD/casegen.env scripts/make_sfc_climo.pbs
+#
+# Writes <CRES>.<field>.tile<N>.nc into $CASEGEN_CLIMO_DIR (9 fields x 6 tiles).
+set -euo pipefail
+source "${CASEGEN_ENV:?set -v CASEGEN_ENV=/path/to/casegen.env}"
+
+export LMOD_TMOD_FIND_FIRST=yes
+module reset
+module use "$CASEGEN_UFS_UTILS/modulefiles"
+module load build.derecho.intel
+
+mkdir -p "$CASEGEN_CLIMO_DIR"
+cd "$CASEGEN_CLIMO_DIR"
+
+# sfc_climo_gen reads ./fort.41, not a named file
+sed -e "s#@CLIMO_SRC@#$CASEGEN_CLIMO_SRC#g" \
+    -e "s#@GRID_DIR@#$CASEGEN_IC_DIR/grid#g" \
+    -e "s#@CRES@#C$CASEGEN_CRES#g" \
+    "$CASEGEN_REPO/templates/sfc_climo.nml" > fort.41
+
+export OMP_NUM_THREADS=1
+mpiexec -n 48 -ppn 48 "$CASEGEN_UFS_UTILS/install/bin/sfc_climo_gen"
+
+# chgres expects <CRES>.<field>.tile<N>.nc
+for f in substrate_temperature vegetation_greenness maximum_snow_albedo \
+         snowfree_albedo facsf slope_type soil_type vegetation_type soil_color; do
+  for t in 1 2 3 4 5 6; do
+    [ -f "${f}.tile${t}.nc" ] && mv -f "${f}.tile${t}.nc" "C${CASEGEN_CRES}.${f}.tile${t}.nc"
+  done
+done
+ls C${CASEGEN_CRES}.*.nc | wc -l | xargs echo "tiled climatology files:"

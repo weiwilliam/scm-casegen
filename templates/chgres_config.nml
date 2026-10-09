@@ -1,0 +1,30 @@
+&config
+  mosaic_file_target_grid="@GRID_DIR@/C@CRES@_mosaic.nc"
+  fix_dir_target_grid="@CLIMO_DIR@"
+  orog_dir_target_grid="@GRID_DIR@/"
+  orog_files_target_grid=@ORO_FILES@
+  data_dir_input_grid="@FORCING_DIR@"
+  sfc_files_input_grid="@SFCANL@"
+  cycle_year=@YEAR@
+  cycle_mon=@MON@
+  cycle_day=@DAY@
+  cycle_hour=@HOUR@
+  convert_atm=.false.
+  convert_sfc=.true.
+  convert_nst=.true.
+  input_type="gaussian_netcdf"
+  external_model="GFS"
+  ! Leave every *_from_climo at .true. The .false. path is broken for
+  ! gaussian_netcdf input in chgres 1.12.3: vfrac comes out byte-identical to
+  ! stype (soil-type categories in the vegetation-fraction slot) and
+  ! shdmin/shdmax are all zero.
+  vgtyp_from_climo=.true.
+  sotyp_from_climo=.true.
+  vgfrc_from_climo=.true.
+  minmax_vgfrc_from_climo=.true.
+  lai_from_climo=.true.
+  tg3_from_soil=.false.
+  regional=0
+  halo_bndy=0
+  halo_blend=0
+/

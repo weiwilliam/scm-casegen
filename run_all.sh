@@ -41,13 +41,21 @@ for i in $(seq "$F" "$T"); do
   case ${ALL[$i]} in
     download)  run download ./scripts/download_gdas.sh ;;
     ics)       run ics bash -c '
+                 log=$CASEGEN_IC_DIR/make_ics.log
+                 mkdir -p "$CASEGEN_IC_DIR"
                  jid=$(qsub -A "$CASEGEN_ACCOUNT" -q "$CASEGEN_QUEUE" \
                             -l job_priority="$CASEGEN_PRIORITY" \
+                            -o "$log" \
                             -v CASEGEN_ENV="$CASEGEN_REPO/casegen.env" \
                             "$CASEGEN_REPO/scripts/make_ics.pbs")
-                 echo "  submitted $jid"
-                 until qstat -f "$jid" 2>/dev/null | grep -q "job_state"; do sleep 5; done
-                 while qstat -f "$jid" 2>/dev/null | grep -q "job_state = [QR]"; do sleep 20; done
+                 echo "  submitted $jid  (log: $log)"
+                 # qstat -x includes finished jobs. Plain qstat can briefly
+                 # answer "Unknown Job Id" for a running job, so an empty
+                 # answer means "ask again", never "done".
+                 field() { qstat -xf "$jid" 2>/dev/null | sed -n "s/^ *$1 = //p"; }
+                 until [[ $(field job_state) == F ]]; do sleep 20; done
+                 rc=$(field Exit_status)
+                 [[ $rc == 0 ]] || { echo "  ERROR: $jid exited with status ${rc:-unknown}; see $log" >&2; exit 1; }
                  echo "  finished $jid"' ;;
     assemble)  run assemble ./scripts/assemble_in_dir.sh ;;
     subset)    run subset "$CASEGEN_PYTHON" python/extract_forcing_subset.py \

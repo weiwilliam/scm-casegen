@@ -229,7 +229,7 @@ def main():
             w.writeheader()
             w.writerows(records)
         print('\nWrote manifest: %s' % args.write_csv)
-        print('Use it with: gen_flux_site_cases.py --locations %s'
+        print('Use it with: gen_scm_cases.py --locations %s'
               % args.write_csv)
 
     n_moved = sum(1 for r in records if float(r['displacement_km']) > 0)

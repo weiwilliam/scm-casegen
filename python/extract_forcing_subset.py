@@ -20,10 +20,9 @@ The per-(file, variable) reads are independent, so this parallelises even for a
 single station -- 9 files x 6 3-D variables = 54 tasks either way.
 
 Note on backends: the work is embarrassingly parallel with coarse tasks and no
-shared graph, so the stdlib process pool is the default and needs no extra
-dependency. --backend dask is provided for parity but buys nothing here; it is
-NOT the threaded scheduler, because netCDF4/HDF5 serialises reads under a global
-lock and threads would give near-zero speedup.
+shared graph, so the stdlib process pool is used and needs no extra dependency.
+Processes, not threads: netCDF4/HDF5 serialises reads under a global lock, so
+threads would give near-zero speedup.
 
 Examples
 --------
@@ -84,7 +83,7 @@ def parse_args():
                         'the stencil at runtime.')
     p.add_argument('-w', '--workers', type=int, default=18,
                    help='parallel worker processes (default: %(default)s)')
-    p.add_argument('-b', '--backend', choices=['processes', 'dask', 'serial'],
+    p.add_argument('-b', '--backend', choices=['processes', 'serial'],
                    default='processes', help='execution backend')
     p.add_argument('--atm_vars', nargs='+', default=ATM_VARS,
                    help='atmf variables to carry over')
@@ -239,22 +238,6 @@ def run_tasks(tasks, backend, workers):
     if backend == 'serial':
         return [read_one(t) for t in tasks]
 
-    if backend == 'dask':
-        try:
-            import dask
-            from dask.diagnostics import ProgressBar
-        except ImportError:
-            raise SystemExit(
-                'dask is not installed in this interpreter. Either use the '
-                'default --backend processes (equivalent here, no dependency) '
-                'or install it: pip install dask')
-        delayed = [dask.delayed(read_one)(t) for t in tasks]
-        # Processes, not threads: netCDF4/HDF5 serialises under a global lock,
-        # so the threaded scheduler would give almost no speedup.
-        with ProgressBar():
-            return list(dask.compute(*delayed, scheduler='processes',
-                                     num_workers=workers))
-
     with ProcessPoolExecutor(max_workers=workers) as pool:
         return list(pool.map(read_one, tasks))
 
@@ -327,7 +310,7 @@ def main():
 
     print('\nTotal: %.1f s' % (time.time() - t_start))
     print('Now run the case generator against the subset:')
-    print('  gen_flux_site_cases.py --forcing_dir %s' % args.out_dir)
+    print('  gen_scm_cases.py --forcing_dir %s' % args.out_dir)
     return 0
 
 

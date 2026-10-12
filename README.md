@@ -75,17 +75,49 @@ Steps 1-3 are one-off. Steps 4-10 are what `./run_all.sh` drives; use
 
 ## 1. Environments
 
-Three different environments are needed. Mixing them up is the most common
-failure.
+Two environments are needed, one for Python and one for compiling. Mixing them
+up is the most common failure.
 
 | Purpose | Set by |
 |---|---|
 | `UFS_case_gen.py`, `check_land_mask.py`, `extract_forcing_subset.py` | `CASEGEN_PYTHON` + `ESMFMKFILE` in `casegen.env` |
 | Building SCM / UFS_UTILS | `modulefiles/build.derecho.intel.lua` |
 
-`UFS_case_gen.py` imports `xesmf` at module scope and dies on import without
-`ESMFMKFILE`. The `swei` conda env does **not** have `xesmf`; the
-`scm_casegen` venv does **not** have `dask`.
+### 1.1 Python: `env_ufscasegen`
+
+Use the conda environment that CCPP-SCM ships for `UFS_case_gen.py`. Its
+dependencies (python 3.8, netCDF4, xarray, xesmf, shapely, f90nml) also cover
+every script in this repo:
+
+```bash
+module load conda
+conda env create -f $CASEGEN_SCM_ROOT/environment-ufscasegen.yml
+# or, to choose where it lives:
+conda env create -f $CASEGEN_SCM_ROOT/environment-ufscasegen.yml -p /path/to/env_ufscasegen
+```
+
+Then point `casegen.env` at it:
+
+```bash
+export CASEGEN_PYTHON=<env prefix>/bin/python
+export ESMFMKFILE=<env prefix>/lib/esmf.mk
+```
+
+`conda env list` shows the prefix. Set `ESMFMKFILE` explicitly, even though
+`conda activate` would set it for you: the scripts here call
+`$CASEGEN_PYTHON` directly and never activate the env. `UFS_case_gen.py`
+imports `xesmf` at module scope, so without `ESMFMKFILE` it fails on import.
+
+Quick check:
+
+```bash
+source casegen.env
+$CASEGEN_PYTHON -c "import xesmf, netCDF4, shapely, f90nml; print('ok')"
+```
+
+### 1.2 Build: Derecho/Intel modules
+
+Used only to compile UFS_UTILS (§3.1) and the SCM (§7); see those sections.
 
 ---
 
@@ -165,6 +197,10 @@ Output is 54 files (9 fields x 6 tiles), renamed by the job to
 qsub -A $CASEGEN_ACCOUNT -q $CASEGEN_QUEUE -l job_priority=$CASEGEN_PRIORITY \
      -v CASEGEN_ENV=$PWD/casegen.env scripts/make_ics.pbs
 ```
+
+`./run_all.sh` submits this for you, waits, stops if the job fails, and writes
+the job log to `$CASEGEN_IC_DIR/make_ics.log`. Submitted by hand as above, the
+log lands in the directory you ran `qsub` from.
 
 24 tasks, ~20 s runtime. The job renders `templates/chgres_config.nml` with the
 date and paths from `casegen.env`, writes it as `config.nml`, and symlinks it to
@@ -308,7 +344,27 @@ global attributes. This matches the shipped `fv3_model_point_noah.nml`.
 
 ## 7. Build the SCM
 
-Full detail in [`scm_build_changes.md`](scm_build_changes.md). Short version:
+Where the build lives, and so where `run_scm.py` is, depends on the SCM version:
+
+| SCM version | Build directory | `run_scm.py` | Executable |
+|---|---|---|---|
+| v7 | `scm/bin` | `scm/bin/run_scm.py` (symlink to `scm/src/run_scm.py`) | `scm/bin/scm` |
+| develop / v8 | `build` (repo root) | `build/run_scm.py` (symlink to `scm/src/run_scm.py`) | `build/scm/src/scm` |
+
+Load the build modules from the SCM checkout first. v7 ships them as
+`scm/etc/modules/derecho_{intel,gnu}.lua`; develop as
+`scm/etc/modules/derecho_intel/<version>`.
+
+**v7**
+
+```bash
+cd $CASEGEN_SCM_ROOT/scm
+mkdir -p bin && cd bin
+cmake -DCCPP_SUITES=$CASEGEN_SUITE ../src
+make -j8
+```
+
+**develop / v8**
 
 ```bash
 cd $CASEGEN_SCM_ROOT
@@ -318,41 +374,78 @@ cmake -DCCPP_SUITES=$CASEGEN_SUITE ../     # NOT ../src, and 'ALL' no longer wor
 make -j8
 ```
 
-Two changes to `run_scm.py` are required for the new layout (both applied):
-
-```diff
--DEFAULT_BIN_DIR = 'scm/bin'
-+DEFAULT_BIN_DIR = 'build'
-
--SCM_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-+SCM_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-```
-
-`realpath` (not `abspath`) resolves the symlink cmake creates in the build
-directory, so the script works invoked either as `build/run_scm.py` or as
-`scm/src/run_scm.py`.
+In develop, `run_scm.py` still defaults to `DEFAULT_BIN_DIR = 'scm/bin'`, which
+no longer matches the build layout. Pass `--bin_dir build` when running (§8),
+or change that default to `'build'` in your checkout.
 
 ---
 
 ## 8. Run
 
+Set `SCM_ROOT` explicitly. `run_scm.py` otherwise derives it from its own path
+using `abspath`, which does not resolve the symlink in the build directory.
+
+**v7**
+
 ```bash
-export LMOD_TMOD_FIND_FIRST=yes
-module reset
-module use $CASEGEN_SCM_ROOT/scm/etc/modules/derecho_intel
-module load 2.0.0                 # NOT 1.6.0 - the SCM is built with ifx 2025.2.1
-export HOST=derecho               # see below
 export SCM_ROOT=$CASEGEN_SCM_ROOT
-cd $SCM_ROOT/scm
-./bin/run_scm.py -c flux_whit_$CASEGEN_DATE -s $CASEGEN_SUITE
+cd $SCM_ROOT/scm/bin
+./run_scm.py -c flux_whit_$CASEGEN_DATE -s $CASEGEN_SUITE \
+    --mpi_command "mpiexec -n 1"
 ```
 
-> **`export HOST=derecho` matters on compute nodes.** `run_scm.py:39` disables
-> the MPI launcher only when `$HOST` contains "derecho". That is true on login
-> nodes but **not** on compute nodes (`dec1735...`), so it falls back to
-> `mpirun -np 1`, which does not exist under cray-mpich — exit code 127.
+**develop / v8**
+
+```bash
+export SCM_ROOT=$CASEGEN_SCM_ROOT
+export HOST=derecho               # see below
+cd $SCM_ROOT
+./build/run_scm.py -c flux_whit_$CASEGEN_DATE -s $CASEGEN_SUITE --bin_dir build
+```
+
+Load the same modules used for the build before running.
+
+> **MPI launcher on Derecho.** Both versions default to `mpirun -np 1`, which
+> does not exist under cray-mpich (exit code 127). Develop disables the
+> launcher when `$HOST` contains "derecho". That is true on login nodes but
+> **not** on compute nodes (`dec1735...`), hence `export HOST=derecho`. v7 has
+> no such check, so always pass `--mpi_command "mpiexec -n 1"`.
 > `--mpi_command ""` does *not* help: an empty string is falsy and re-triggers
-> the default. Either set `HOST`, or pass `--mpi_command "mpiexec -n 1"`.
+> the default.
+
+### 8.1 Known issue: `vegtype_frac` / `soiltype_frac` are missing (v7 stops)
+
+**Status: open, waiting for an upstream fix to `UFS_case_gen.py`.**
+
+With ICs from §3 (chgres_cube 1.12.3), a v7 run stops during initialisation:
+
+```
+The variable 'vegtype_frac' in the case data file had missing data, but it is
+required for the given physics configuration. Stopping...
+```
+
+`UFS_case_gen.py` copies `vegtype_frac` and `soiltype_frac` from the
+`vegetation_type_pct` and `soil_type_pct` fields of `sfc_data.tile*.nc`. Neither
+the chgres output nor the EPIC regression-test ICs contain those fields, so both
+come out as `-9999` in every case file.
+
+v7 and develop both list the two fields as required, but only v7 notices the
+`-9999`:
+
+- **v7** compares against `missing_value`, which is reset from the file's
+  global `missing_value` attribute (`-9999.0`). It finds the gap and stops.
+- **develop** compares against `missing_value_dp`, which stays at the netCDF fill
+  value (~9.97e36) because only `missing_value` is reset from the file.
+  `-9999` never matches, so the run continues with `vegtype_frac = -9999`.
+
+So in develop, *any* field that `UFS_case_gen.py` writes as `-9999` gets past
+the required-variable check without a warning. For these two fields the
+`SCM_GFS_v17_p8_*` suites are unaffected, since Noah-MP does not read them;
+in CCPP physics only the RUC LSM and the smoke/dust scheme do. Do not use these
+cases with RUC.
+
+Until `UFS_case_gen.py` is fixed, v7 cannot run these cases. Develop runs, but
+check the case file for `-9999` in any field your suite needs.
 
 ---
 
@@ -380,19 +473,26 @@ and spared mostly by cloud cover.
 
 ## 10. Adapting to a new date
 
-1. Repeat [§2](#2-download-the-gdas-data) with the new date.
-2. Repeat [§3.3](#33-surface-ics-for-the-case-date) and
-   [§3.4](#34-assemble-in_dir) — edit `cycle_year/mon/day/hour` and
-   `sfc_files_input_grid` in `chgres_run/config.nml`. §3.1 and §3.2 do **not**
-   need repeating.
-3. Repeat §4-§6 with the new date. Update `CASE_DATE` / `IN_DIR` /
-   `FORCING_DIR` in `gen_flux_site_cases.py`, or pass them on the command line.
-4. Re-run `check_land_mask.py` — the land mask is grid-static but **sea ice is
-   not** (`slmsk = 2`), so a winter date can change which sites pass.
-5. `make_scm_flux_figures.py --date <new> --suite <suite>`.
+Every per-date step reads the date from `casegen.env`, so nothing has to be
+edited by hand:
 
-A different resolution additionally needs §3.2 rebuilt for that grid, and
-`C_RES` changed in the `case_config` namelists.
+1. Set `CASEGEN_DATE` (and `CASEGEN_LENGTH_HOURS` if needed) in `casegen.env`.
+   The forcing, subset, IC and locations paths all derive from it.
+2. Run `./run_all.sh`. That repeats §2-§6: download, surface ICs (the chgres
+   namelist is rendered from `templates/chgres_config.nml` with the new date),
+   `in_dir`, forcing subset, land-consistent coordinates, case files and
+   namelists. §3.1 and §3.2 do **not** need repeating.
+3. Do not skip the `locations` step. The land mask is grid-static but **sea ice
+   is not** (`slmsk = 2`), so a winter date can change which sites pass.
+4. Run the checks in [§9](#9-verify) for the new date before using the output.
+
+To build only part of the chain, use `--from`/`--to`, e.g.
+`./run_all.sh --from subset` once the ICs already exist.
+
+A different resolution also needs `CASEGEN_CRES` changed and the tiled
+climatology (§3.2) rebuilt for that grid. `CASEGEN_STATIC_GRID` must point at
+grid and orography files for the same resolution. The `case_config` namelists
+pick up `C_RES` from `CASEGEN_CRES` automatically.
 
 ---
 
@@ -413,6 +513,7 @@ Every path is set in `casegen.env`; nothing below is hardcoded in a script.
 | `CASEGEN_SITES_CSV` | station list (`stid`, `lat [degrees]`, `lon [degrees]`) |
 | `CASEGEN_LOCATIONS_CSV` | land-consistent coordinates from `check_land_mask.py` |
 | `CASEGEN_PYTHON` | interpreter with `xesmf` + `netCDF4` (plus `ESMFMKFILE`) |
+| `CASEGEN_REPO` | this repo; derived from the location of `casegen.env`, so leave it as is |
 
 Generated cases land inside the SCM checkout, because `UFS_case_gen.py` writes
 relative to its own location:

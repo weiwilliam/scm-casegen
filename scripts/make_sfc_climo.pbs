@@ -14,6 +14,8 @@
 # Writes <CRES>.<field>.tile<N>.nc into $CASEGEN_CLIMO_DIR (9 fields x 6 tiles).
 set -euo pipefail
 source "${CASEGEN_ENV:?set -v CASEGEN_ENV=/path/to/casegen.env}"
+# casegen.env lives at the repo root; older copies may not set CASEGEN_REPO.
+CASEGEN_REPO=${CASEGEN_REPO:-$(cd "$(dirname "$CASEGEN_ENV")" && pwd)}
 
 export LMOD_TMOD_FIND_FIRST=yes
 module reset
